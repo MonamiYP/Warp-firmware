@@ -1,10 +1,5 @@
 #include <stdint.h>
 
-/*
- *	config.h needs to come first
- */
-#include "config.h"
-
 #include "fsl_spi_master_driver.h"
 #include "fsl_port_hal.h"
 
@@ -13,8 +8,8 @@
 #include "warp.h"
 #include "devSSD1331.h"
 
-volatile uint8_t	inBuffer[1];
-volatile uint8_t	payloadBytes[1];
+volatile uint8_t	inBuffer[32];
+volatile uint8_t	payloadBytes[32];
 
 
 /*
@@ -28,6 +23,32 @@ enum
 	kSSD1331PinDC		= GPIO_MAKE_PIN(HW_GPIOA, 12),
 	kSSD1331PinRST		= GPIO_MAKE_PIN(HW_GPIOB, 0),
 };
+
+static int
+writeData(uint16_t dataByte)
+{
+	spi_status_t status;
+	// CS Low
+	
+	GPIO_DRV_SetPinOutput(kSSD1331PinCSn);
+	OSA_TimeDelay(10);
+	GPIO_DRV_ClearPinOutput(kSSD1331PinCSn);
+
+	// DC high (data)
+	GPIO_DRV_SetPinOutput(kSSD1331PinDC);
+
+	payloadBytes[0] = dataByte;
+	status = SPI_DRV_MasterTransferBlocking(0,
+			NULL,
+			(const uint16_t * restrict)&payloadBytes[0],
+			(uint16_t * restrict)&inBuffer[0],
+			1,
+			1000);
+
+	// Drive CS high
+	GPIO_DRV_SetPinOutput(kSSD1331PinCSn);
+	return status;
+}
 
 static int
 writeCommand(uint8_t commandByte)
@@ -77,7 +98,7 @@ devSSD1331init(void)
 	PORT_HAL_SetMuxMode(PORTA_BASE, 8u, kPortMuxAlt3);
 	PORT_HAL_SetMuxMode(PORTA_BASE, 9u, kPortMuxAlt3);
 
-	enableSPIpins();
+	warpEnableSPIpins();
 
 	/*
 	 *	Override Warp firmware's use of these pins.
@@ -139,12 +160,14 @@ devSSD1331init(void)
 	writeCommand(kSSD1331CommandCONTRASTC);		// 0x83
 	writeCommand(0x7D);
 	writeCommand(kSSD1331CommandDISPLAYON);		// Turn on oled panel
+	SEGGER_RTT_WriteString(0, "\r\n\tDone with initialization sequence...\n");
 
 	/*
 	 *	To use fill commands, you will have to issue a command to the display to enable them. See the manual.
 	 */
 	writeCommand(kSSD1331CommandFILL);
 	writeCommand(0x01);
+	SEGGER_RTT_WriteString(0, "\r\n\tDone with enabling fill...\n");
 
 	/*
 	 *	Clear Screen
@@ -154,15 +177,44 @@ devSSD1331init(void)
 	writeCommand(0x00);
 	writeCommand(0x5F);
 	writeCommand(0x3F);
+	SEGGER_RTT_WriteString(0, "\r\n\tDone with screen clear...\n");
 
 
 
 	/*
-	 *	Any post-initialization drawing commands go here.
+	 *	Read the manual for the SSD1331 (SSD1331_1.2.pdf) to figure
+	 *	out how to fill the entire screen with the brightest shade
+	 *	of green.
 	 */
-	//...
 
 
+	uint16_t green = 0x07E0;
+	writeCommand(kSSD1331CommandDRAWRECT);
+	writeCommand(0x00);
+	writeCommand(0x00);
+	writeCommand(0x7F);
+	writeCommand(0x3F);
+	writeCommand(0x00);
+	writeCommand(0x3F);
+	writeCommand(0x00);
+	writeCommand(0x00);
+	writeCommand(0x3F);
+	writeCommand(0x00);
 
-	return 0;
+	//for (int i=0; i < (96 * 64); i++) {
+		//writeData(green);
+	//}
+
+	SEGGER_RTT_WriteString(0, "\r\n\tDone with draw rectangle...\n");
+
+	/*while (1) {
+		SEGGER_RTT_WriteString(0, "\r\tHigh\n)");
+		GPIO_DRV_SetPinOutput(kSSD1331PinRST);
+		OSA_TimeDelay(1000);
+		SEGGER_RTT_WriteString(0, "\r\tLow\n");
+		GPIO_DRV_ClearPinOutput(kSSD1331PinRST);
+		OSA_TimeDelay(1000);
+	}
+
+	*/return 0;
 }

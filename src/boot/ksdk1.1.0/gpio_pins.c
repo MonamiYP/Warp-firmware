@@ -34,7 +34,7 @@ gpio_output_pin_user_config_t	outputPins[] =
 	/*
 	 *	Set unused pins as outputs
 	 */
-	#if (!WARP_BUILD_ENABLE_GLAUX_VARIANT && !WARP_BUILD_ENABLE_FRDMKL03)
+	#if (!WARP_BUILD_ENABLE_GLAUX_VARIANT)
 		{
 			.pinName = kWarpPinBGX_nRST,
 			.config.outputLogic = 1,
@@ -97,12 +97,12 @@ gpio_output_pin_user_config_t	outputPins[] =
 			.config.slewRate = kPortSlowSlewRate,
 			.config.driveStrength = kPortLowDriveStrength,
 		},
-		{
+		/*{
 			.pinName = kWarpPinSI4705_nRST,
 			.config.outputLogic = 1,
 			.config.slewRate = kPortSlowSlewRate,
 			.config.driveStrength = kPortLowDriveStrength,
-		},
+		},*/
 		/*	Not GPIO, so don't configure it as GPIO
 		{
 			.pinName = kWarpPinI2C0_SCL_UART_TX,
@@ -117,6 +117,7 @@ gpio_output_pin_user_config_t	outputPins[] =
 			.config.driveStrength = kPortLowDriveStrength,
 		},
 		*/
+		/*
 		{
 			.pinName = kWarpPinTPS62740_REGCTRL,
 			.config.outputLogic = 1,
@@ -147,6 +148,7 @@ gpio_output_pin_user_config_t	outputPins[] =
 			.config.slewRate = kPortSlowSlewRate,
 			.config.driveStrength = kPortLowDriveStrength,
 		},
+		*/
 		/*	Not GPIO, so don't configure it as GPIO
 		{
 			.pinName = kWarpPinCLKOUT32K,
@@ -168,9 +170,6 @@ gpio_output_pin_user_config_t	outputPins[] =
 			.config.slewRate = kPortSlowSlewRate,
 			.config.driveStrength = kPortLowDriveStrength,
 		},
-		
-		
-	#elif (WARP_BUILD_ENABLE_FRDMKL03)
 
 	#endif
 
