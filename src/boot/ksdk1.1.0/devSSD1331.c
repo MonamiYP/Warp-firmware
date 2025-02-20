@@ -25,32 +25,6 @@ enum
 };
 
 static int
-writeData(uint16_t dataByte)
-{
-	spi_status_t status;
-	// CS Low
-	
-	GPIO_DRV_SetPinOutput(kSSD1331PinCSn);
-	OSA_TimeDelay(10);
-	GPIO_DRV_ClearPinOutput(kSSD1331PinCSn);
-
-	// DC high (data)
-	GPIO_DRV_SetPinOutput(kSSD1331PinDC);
-
-	payloadBytes[0] = dataByte;
-	status = SPI_DRV_MasterTransferBlocking(0,
-			NULL,
-			(const uint16_t * restrict)&payloadBytes[0],
-			(uint16_t * restrict)&inBuffer[0],
-			1,
-			1000);
-
-	// Drive CS high
-	GPIO_DRV_SetPinOutput(kSSD1331PinCSn);
-	return status;
-}
-
-static int
 writeCommand(uint8_t commandByte)
 {
 	spi_status_t status;
@@ -201,20 +175,7 @@ devSSD1331init(void)
 	writeCommand(0x3F);
 	writeCommand(0x00);
 
-	//for (int i=0; i < (96 * 64); i++) {
-		//writeData(green);
-	//}
-
 	SEGGER_RTT_WriteString(0, "\r\n\tDone with draw rectangle...\n");
 
-	/*while (1) {
-		SEGGER_RTT_WriteString(0, "\r\tHigh\n)");
-		GPIO_DRV_SetPinOutput(kSSD1331PinRST);
-		OSA_TimeDelay(1000);
-		SEGGER_RTT_WriteString(0, "\r\tLow\n");
-		GPIO_DRV_ClearPinOutput(kSSD1331PinRST);
-		OSA_TimeDelay(1000);
-	}
-
-	*/return 0;
+	return 0;
 }
