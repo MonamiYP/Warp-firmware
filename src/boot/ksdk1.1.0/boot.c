@@ -122,7 +122,7 @@
 #endif
 
 #if (WARP_BUILD_ENABLE_DEVMMA8451Q)
-	volatile WarpI2CDeviceState			deviceMMA8451QState;
+	volatile WarpI2CDeviceState 		deviceMMA8451QState;
 #endif
 #if (WARP_BUILD_ENABLE_DEVBNO055)
 	#include "devBNO055.h"
@@ -195,8 +195,9 @@
 	#include "devBGX.h"
 	volatile WarpUARTDeviceState			deviceBGXState;
 #endif
+
 #if (WARP_BUILD_ENABLE_DEVINA219)
-	volatile WarpI2CDeviceState			deviceINA219State;
+	volatile WarpI2CDeviceState 		deviceINA219State;
 #endif
 
 typedef enum
