@@ -89,6 +89,8 @@
 #include "devRV8803C7.h"
 #include "devRF430CL331H.h"
 #include "devSSD1331.h"
+#include "devINA219.h"
+
 #if (WARP_BUILD_ENABLE_DEVADXL362)
 	volatile WarpSPIDeviceState			deviceADXL362State;
 #endif
@@ -193,6 +195,9 @@
 	#include "devBGX.h"
 	volatile WarpUARTDeviceState			deviceBGXState;
 #endif
+#if (WARP_BUILD_ENABLE_DEVINA219)
+	volatile WarpI2CDeviceState			deviceINA219State;
+#endif
 
 typedef enum
 {
@@ -212,6 +217,7 @@ typedef enum
 	kWarpFlashRF430CL331HBitField	= 0b10000000000000,
 	kWarpFlashRV8803C7BitField		= 0b100000000000000,
 	kWarpFlashNumConfigErrors		= 0b1000000000000000,
+	kWarpFlashINA219BitField		= 0b10000000000000000,
 } WarpFlashSensorBitFieldEncoding;
 
 volatile i2c_master_state_t		  i2cMasterState;
@@ -1717,6 +1723,10 @@ main(void)
 		initAS7263(	0x49	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsAS7263	);
 #endif
 
+#if (WARP_BUILD_ENABLE_DEVINA219)
+		initMMA8451Q(	0x40	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsINA219	);
+#endif
+
 #if (WARP_BUILD_ENABLE_DEVRV8803C7)
 		initRV8803C7(	0x32	/* i2cAddress */,					kWarpDefaultSupplyVoltageMillivoltsRV8803C7	);
 		status = setRTCCountdownRV8803C7(0 /* countdown */, kWarpRV8803ExtTD_1HZ /* frequency */, false /* interupt_enable */);
@@ -2046,6 +2056,8 @@ main(void)
 	}
 #endif
 
+devSSD1331init();
+devINA219init();
 	while (1)
 	{
 		/*
@@ -2056,7 +2068,7 @@ main(void)
 		gWarpExtraQuietMode = false;
 		printBootSplash(gWarpCurrentSupplyVoltage, menuRegisterAddress, &powerManagerCallbackStructure);
 
-		devSSD1331init();
+		
 		warpPrint("\rSelect:\n");
 		warpPrint("\r- 'a': set default sensor.\n");
 		warpPrint("\r- 'b': set I2C baud rate.\n");
@@ -2212,6 +2224,12 @@ main(void)
 					warpPrint("\r\t- 'k' AS7263			(0x00--0x2B): 2.7V -- 3.6V\n");
 #else
 					warpPrint("\r\t- 'k' AS7263			(0x00--0x2B): 2.7V -- 3.6V (compiled out) \n");
+#endif
+
+#if (WARP_BUILD_ENABLE_DEVINA219)
+					warpPrint("\r\t- 'k' IN219			(0x00--0x2B): 3.0V -- 5.5V\n");
+#else
+					warpPrint("\r\t- 'k' IN219			(0x00--0x2B): 3.0V -- 5.5V (compiled out) \n");
 #endif
 
 				warpPrint("\r\tEnter selection> ");
@@ -2382,6 +2400,14 @@ main(void)
 					{
 						menuTargetSensor = kWarpSensorAS7263;
 						menuI2cDevice = &deviceAS7263State;
+						break;
+					}
+#endif
+#if (WARP_BUILD_ENABLE_INA219)
+					case 'l':
+					{
+						menuTargetSensor = kWarpSensorINA219;
+						menuI2cDevice = &deviceINA219State;
 						break;
 					}
 #endif
@@ -3352,6 +3378,14 @@ writeAllSensorsToFlash(int menuDelayBetweenEachRun, int loopForever)
 	sensorBitField = sensorBitField | kWarpFlashRV8803C7BitField;
 #endif
 
+#if (WARP_BUILD_ENABLE_DEVINA219)
+	numberOfConfigErrors += configureSensorINA219( /* MONAMI: EDIT THIS */
+		0x00, /* Payload: Disable FIFO */
+		0x01  /* Normal read 8bit, 800Hz, normal, active mode */
+	);
+	sensorBitField = sensorBitField | kWarpFlashINA219BitField;
+#endif
+
 	// Add readingCount, 1 x timing, numberofConfigErrors
 	uint8_t sensorBitFieldSize = 2;
 	uint8_t bytesWrittenIndex  = 0;
@@ -3445,6 +3479,10 @@ writeAllSensorsToFlash(int menuDelayBetweenEachRun, int loopForever)
 
 #if (WARP_BUILD_ENABLE_DEVRV8803C7)
 		bytesWrittenIndex += appendSensorDataRV8803C7(flashWriteBuf + bytesWrittenIndex);
+#endif
+
+#if (WARP_BUILD_ENABLE_DEVINA219)
+		bytesWrittenIndex += appendSensorDataINA219(flashWriteBuf + bytesWrittenIndex);
 #endif
 
 		/*
@@ -3608,6 +3646,13 @@ printAllSensors(bool printHeadersAndCalibration, bool hexModeFlag,
 		(0b1010000 << 8));
 #endif
 
+#if (WARP_BUILD_ENABLE_INA219)
+	numberOfConfigErrors += configureSensorINA219( /* MONAMI: EDIT THIS */
+		0x00, /* Payload: Disable FIFO */
+		0x01  /* Normal read 8bit, 800Hz, normal, active mode */
+	);
+#endif
+
 	if (printHeadersAndCalibration)
 	{
 
@@ -3662,6 +3707,10 @@ printAllSensors(bool printHeadersAndCalibration, bool hexModeFlag,
 		warpPrint(" HDC1000 Temp, HDC1000 Hum,");
 #endif
 
+#if (WARP_BUILD_ENABLE_DEVINA219)
+		warpPrint(" INA219 PRINT "); /* MONAMI: EDIT THIS, printSensorDataINA219 in github */
+#endif
+
 #if (WARP_CSVSTREAM_FLASH_PRINT_METADATA)
 		warpPrint(" RTC->TSR, RTC->TPR,");
 #endif
@@ -3713,6 +3762,10 @@ printAllSensors(bool printHeadersAndCalibration, bool hexModeFlag,
 
 #if (WARP_BUILD_ENABLE_DEVHDC1000)
 		printSensorDataHDC1000(hexModeFlag);
+#endif
+
+#if (WARP_BUILD_ENABLE_DEVINA219)
+		printSensorDataINA219(hexModeFlag);
 #endif
 
 #if (WARP_CSVSTREAM_FLASH_PRINT_METADATA)
@@ -4437,6 +4490,36 @@ repeatRegisterReadForDeviceAndAddress(WarpSensorDevice warpSensorDevice, uint8_t
 
 			break;
 		}
+
+		case kWarpSensorINA219:
+		{
+/*
+ *	INA219: VDD 3.0--5.5
+ */
+#if (WARP_BUILD_ENABLE_DEVINA219)
+				loopForSensor(	"\r\nINA219:\n\r",		/*	tagString			*/
+						&readSensorRegisterINA219,	/*	readSensorRegisterFunction	*/
+						&deviceINA219State,		/*	i2cDeviceState			*/
+						NULL,				/*	spiDeviceState			*/
+						baseAddress,			/*	baseAddress			*/
+						0x00,				/*	minAddress			*/
+						0x31,				/*	maxAddress			*/
+						repetitionsPerAddress,		/*	repetitionsPerAddress		*/
+						chunkReadsPerAddress,		/*	chunkReadsPerAddress		*/
+						spinDelay,			/*	spinDelay			*/
+						autoIncrement,			/*	autoIncrement			*/
+						sssupplyMillivolts,		/*	sssupplyMillivolts		*/
+						referenceByte,			/*	referenceByte			*/
+						adaptiveSssupplyMaxMillivolts,	/*	adaptiveSssupplyMaxMillivolts	*/
+						chatty				/*	chatty				*/
+			);
+#else
+			warpPrint("\r\n\tINA219 Read Aborted. Device Disabled :(");
+#endif
+
+			break;
+		}
+
 
 		default:
 		{
@@ -5170,6 +5253,20 @@ flashDecodeSensorBitField(uint16_t sensorBitField, uint8_t sensorIndex, uint8_t*
 		{
 			*sizePerReading		= 4;
 			*numberOfReadings = 1;
+			return;
+		}
+	}
+
+	/*
+	 * INA219
+	*/
+	if (sensorBitField & kWarpFlashINA219BitField)
+	{
+		numberOfSensorsFound++;
+		if (numberOfSensorsFound - 1 == sensorIndex)
+		{
+			*sizePerReading		= bytesPerReadingINA219;
+			*numberOfReadings = numberOfReadingsPerMeasurementINA219;
 			return;
 		}
 	}
