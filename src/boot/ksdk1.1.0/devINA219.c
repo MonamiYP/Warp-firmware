@@ -14,20 +14,42 @@
 #include "SEGGER_RTT.h"
 #include "warp.h"
 
+#include "devINA219.h"
+
 
 extern volatile WarpI2CDeviceState	deviceINA219State;
 extern volatile uint32_t			gWarpI2cBaudRateKbps;
 extern volatile uint32_t			gWarpI2cTimeoutMilliseconds;
 extern volatile uint32_t			gWarpSupplySettlingDelayMilliseconds;
 
-
+typedef enum {
+	INA219_ConfigurationRegister = 0x0,
+	INA219_ShuntVoltageRegister = 0x1,
+	INA219_BusVoltageRegister = 0x2,
+	INA219_PowerRegister = 0x3,
+	INA219_CurrentRegister = 0x4,
+	INA219_CalibrationRegister = 0x5,
+};
 
 void
 initINA219(const uint8_t i2cAddress, uint16_t operatingVoltageMillivolts)
 {
 	deviceINA219State.i2cAddress					= i2cAddress;
 	deviceINA219State.operatingVoltageMillivolts	= operatingVoltageMillivolts;
+	configureSensorINA219();
 
+	WarpStatus regStatus;
+	regStatus = readSensorRegisterINA219(INA219_ConfigurationRegister, 2);
+	warpPrint("Configuration Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
+		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
+
+	regStatus = readSensorRegisterINA219(INA219_CalibrationRegister, 2);
+	warpPrint("Calibration Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
+		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
+
+	regStatus = readSensorRegisterINA219(INA219_BusVoltageRegister, 2);
+	warpPrint("Bus Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
+		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
 	return;
 }
 
@@ -60,7 +82,8 @@ writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 
 	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
 	commandByte[0] = deviceRegister;
-	payloadByte[0] = payload;
+	payloadByte[0] = (uint8_t)(payload >> 8); // MSB
+	payloadByte[1] = (uint8_t)(payload & 0xFF); // LSB
 	warpEnableI2Cpins();
 
 	status = I2C_DRV_MasterSendDataBlocking(
@@ -69,7 +92,7 @@ writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 		commandByte,
 		1,
 		payloadByte,
-		1,
+		2,
 		gWarpI2cTimeoutMilliseconds);
 	if (status != kStatus_I2C_Success)
 	{
@@ -80,15 +103,16 @@ writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 }
 
 WarpStatus
-configureSensorINA219(uint8_t payloadF_SETUP, uint8_t payloadCTRL_REG1)
+configureSensorINA219()
 {
 	WarpStatus	i2cWriteStatus1, i2cWriteStatus2;
+	warpPrint("\nConfiguring INA219...\n");
 
 	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
 
-	i2cWriteStatus1 = writeSensorRegisterINA219(INA219_ConfigurationRegister, (uint16_t)0b0011100001111101);
+	i2cWriteStatus1 = writeSensorRegisterINA219(INA219_ConfigurationRegister, (uint16_t)0b0000000110011111);
 
-	i2cWriteStatus2 = writeSensorRegisterINA219(INA219_CalibrationRegister, (uint16_t)0xE4); // 228 
+	i2cWriteStatus2 = writeSensorRegisterINA219(INA219_CalibrationRegister, (uint16_t)0x5000);  
 
 	return (i2cWriteStatus1 | i2cWriteStatus2);
 }
@@ -137,6 +161,7 @@ readSensorRegisterINA219(uint8_t deviceRegister, int numberOfBytes)
 
 	if (status != kStatus_I2C_Success)
 	{
+		warpPrint("not successful reading");
 		return kWarpStatusDeviceCommunicationFailed;
 	}
 
@@ -154,19 +179,7 @@ printSensorDataINA219(bool hexModeFlag)
 
 	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
 
-	/*
-	 *	From the MMA8451Q datasheet:
-	 *
-	 *		"A random read access to the LSB registers is not possible.
-	 *		Reading the MSB register and then the LSB register in sequence
-	 *		ensures that both bytes (LSB and MSB) belong to the same data
-	 *		sample, even if a new data sample arrives between reading the
-	 *		MSB and the LSB byte."
-	 *
-	 *	We therefore do 2-byte read transactions, for each of the registers.
-	 *	We could also improve things by doing a 6-byte read transaction.
-	 */
-	i2cReadStatus = readSensorRegisterINA219(INA219_CurrentRegister, 2 /* numberOfBytes */);
+	i2cReadStatus = readSensorRegisterINA219(INA219_CurrentRegister, 2);
 	readSensorRegisterValueMSB = deviceINA219State.i2cBuffer[0];
 	readSensorRegisterValueLSB = deviceINA219State.i2cBuffer[1];
 	readSensorRegisterValueCombined = (readSensorRegisterValueLSB | readSensorRegisterValueMSB << 8);
@@ -185,6 +198,39 @@ printSensorDataINA219(bool hexModeFlag)
 		{
 			warpPrint(" %d,", readSensorRegisterValueCombined);
 		}
+	}
+}
+
+void
+printCurrentINA219()
+{
+	uint16_t	shunt_voltage;
+	uint16_t	current;
+	uint16_t	calibration;
+	WarpStatus	i2cReadStatus;
+
+	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
+
+	i2cReadStatus = readSensorRegisterINA219(INA219_BusVoltageRegister, 2);
+	shunt_voltage = (deviceINA219State.i2cBuffer[0] << 8) | deviceINA219State.i2cBuffer[1];
+	float shunt_voltage_mV = (float)shunt_voltage * 0.01;
+	warpPrint("Shunt voltage (mV) = %.2f,\n", shunt_voltage_mV);
+
+	i2cReadStatus = readSensorRegisterINA219(INA219_CalibrationRegister, 2);
+	calibration = (deviceINA219State.i2cBuffer[1] | deviceINA219State.i2cBuffer[0] << 8);
+
+	i2cReadStatus = readSensorRegisterINA219(INA219_CurrentRegister, 2);
+	current = (deviceINA219State.i2cBuffer[1] | deviceINA219State.i2cBuffer[0] << 8);
+	float current_mA = shunt_voltage_mV * 0.01 * (float)calibration / 4096.f;
+
+	if (i2cReadStatus != kWarpStatusOK)
+	{
+		warpPrint(" ----,");
+	}
+	else
+	{
+		warpPrint("Calculated current (mA) = %.2f,\n", current_mA);
+		warpPrint("Current (mA) = %.2f,\n\n", current);
 	}
 }
 

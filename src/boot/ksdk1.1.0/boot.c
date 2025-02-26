@@ -216,9 +216,8 @@ typedef enum
 	kWarpFlashCCS811BitField		= 0b100000000000,
 	kWarpFlashHDC1000BitField		= 0b1000000000000,
 	kWarpFlashRF430CL331HBitField	= 0b10000000000000,
-	kWarpFlashRV8803C7BitField		= 0b100000000000000,
+	kWarpFlashINA219BitField		= 0b100000000000000,
 	kWarpFlashNumConfigErrors		= 0b1000000000000000,
-	kWarpFlashINA219BitField		= 0b10000000000000000,
 } WarpFlashSensorBitFieldEncoding;
 
 volatile i2c_master_state_t		  i2cMasterState;
@@ -1724,9 +1723,24 @@ main(void)
 		initAS7263(	0x49	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsAS7263	);
 #endif
 
-#if (WARP_BUILD_ENABLE_DEVINA219)
-		initMMA8451Q(	0x40	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsINA219	);
-#endif
+// #if (WARP_BUILD_ENABLE_DEVINA219)
+// 		initINA219(	0x40	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsINA219	);
+// 		// // Check the INA219's Configuration and Calibration Registers.
+// 		// warpPrint("Initialising INA219...");
+// 		// WarpStatus regStatus;
+// 		// regStatus = readSensorRegisterINA219(0x0, 2 /* numberOfBytes */);
+// 		// warpPrint("Finished reading %d from INA219 Configuration Register.\n", (deviceINA219State.i2cBuffer[0]  * 256) + deviceINA219State.i2cBuffer[1]);
+// 		// regStatus = readSensorRegisterINA219(0x5, 2 /* numberOfBytes */);
+// 		// warpPrint("Finished reading %d from INA219 Calibration Register.\n", (deviceINA219State.i2cBuffer[0]  * 256) + deviceINA219State.i2cBuffer[1]);
+
+// 		// for (int i = 0; i < 1000; i++){
+// 		// 	printSensorDataINA219(true);
+// 		// 	// OLEDCurrent = printSensorDataINA219(false);
+// 		// 	//  warpPrint("INA219, %d, %d, uA\n", i, OLEDCurrent);
+// 		// 	// warpPrint("%d\n", OLEDCurrent); // Raw data for generating CSV.
+// 		// }
+// 		// warpPrint("\nFinished running INA219 loop.\n");
+// #endif
 
 #if (WARP_BUILD_ENABLE_DEVRV8803C7)
 		initRV8803C7(	0x32	/* i2cAddress */,					kWarpDefaultSupplyVoltageMillivoltsRV8803C7	);
@@ -2057,8 +2071,7 @@ main(void)
 	}
 #endif
 
-devSSD1331init();
-devINA219init();
+// devSSD1331init();
 	while (1)
 	{
 		/*
@@ -2069,6 +2082,16 @@ devINA219init();
 		gWarpExtraQuietMode = false;
 		printBootSplash(gWarpCurrentSupplyVoltage, menuRegisterAddress, &powerManagerCallbackStructure);
 
+		initINA219(	0x40	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsINA219	);
+		warpPrint("Initialising INA219...");
+
+		for (int i = 0; i < 1000; i++){
+			printCurrentINA219();
+			// OLEDCurrent = printSensorDataINA219(false);
+			//  warpPrint("INA219, %d, %d, uA\n", i, OLEDCurrent);
+			// warpPrint("%d\n", OLEDCurrent); // Raw data for generating CSV.
+		}
+		warpPrint("\nFinished running INA219 loop.\n");
 		
 		warpPrint("\rSelect:\n");
 		warpPrint("\r- 'a': set default sensor.\n");
@@ -2228,9 +2251,9 @@ devINA219init();
 #endif
 
 #if (WARP_BUILD_ENABLE_DEVINA219)
-					warpPrint("\r\t- 'k' IN219			(0x00--0x2B): 3.0V -- 5.5V\n");
+					warpPrint("\r\t- 'l' IN219			(0x00--0x2B): 3.0V -- 5.5V\n");
 #else
-					warpPrint("\r\t- 'k' IN219			(0x00--0x2B): 3.0V -- 5.5V (compiled out) \n");
+					warpPrint("\r\t- 'l' IN219			(0x00--0x2B): 3.0V -- 5.5V (compiled out) \n");
 #endif
 
 				warpPrint("\r\tEnter selection> ");
@@ -2404,7 +2427,7 @@ devINA219init();
 						break;
 					}
 #endif
-#if (WARP_BUILD_ENABLE_INA219)
+#if (WARP_BUILD_ENABLE_DEVINA219)
 					case 'l':
 					{
 						menuTargetSensor = kWarpSensorINA219;
@@ -3648,10 +3671,7 @@ printAllSensors(bool printHeadersAndCalibration, bool hexModeFlag,
 #endif
 
 #if (WARP_BUILD_ENABLE_INA219)
-	numberOfConfigErrors += configureSensorINA219( /* MONAMI: EDIT THIS */
-		0x00, /* Payload: Disable FIFO */
-		0x01  /* Normal read 8bit, 800Hz, normal, active mode */
-	);
+	numberOfConfigErrors += configureSensorINA219();
 #endif
 
 	if (printHeadersAndCalibration)
@@ -3767,6 +3787,7 @@ printAllSensors(bool printHeadersAndCalibration, bool hexModeFlag,
 
 #if (WARP_BUILD_ENABLE_DEVINA219)
 		printSensorDataINA219(hexModeFlag);
+		warpPrint("\nPrinting INA219 data\n");
 #endif
 
 #if (WARP_CSVSTREAM_FLASH_PRINT_METADATA)
@@ -4498,6 +4519,7 @@ repeatRegisterReadForDeviceAndAddress(WarpSensorDevice warpSensorDevice, uint8_t
  *	INA219: VDD 3.0--5.5
  */
 #if (WARP_BUILD_ENABLE_DEVINA219)
+				warpPrint("\r\n\tloopForSensor INA219\n\r");
 				loopForSensor(	"\r\nINA219:\n\r",		/*	tagString			*/
 						&readSensorRegisterINA219,	/*	readSensorRegisterFunction	*/
 						&deviceINA219State,		/*	i2cDeviceState			*/
