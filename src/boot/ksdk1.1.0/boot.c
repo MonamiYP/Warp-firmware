@@ -2071,7 +2071,6 @@ main(void)
 	}
 #endif
 
-// devSSD1331init();
 	while (1)
 	{
 		/*
@@ -2082,16 +2081,18 @@ main(void)
 		gWarpExtraQuietMode = false;
 		printBootSplash(gWarpCurrentSupplyVoltage, menuRegisterAddress, &powerManagerCallbackStructure);
 
-		initINA219(	0x40	/* i2cAddress */,	kWarpDefaultSupplyVoltageMillivoltsINA219	);
-		warpPrint("Initialising INA219...");
+		devSSD1331init();
+		OSA_TimeDelay(1000);
 
-		for (int i = 0; i < 1000; i++){
+
+		warpPrint("Initialising INA219...");
+		OSA_TimeDelay(1000);
+		initINA219(	0x40, kWarpDefaultSupplyVoltageMillivoltsINA219);
+		for (int i = 0; i < 100; i++){
 			printCurrentINA219();
-			// OLEDCurrent = printSensorDataINA219(false);
-			//  warpPrint("INA219, %d, %d, uA\n", i, OLEDCurrent);
-			// warpPrint("%d\n", OLEDCurrent); // Raw data for generating CSV.
 		}
 		warpPrint("\nFinished running INA219 loop.\n");
+
 		
 		warpPrint("\rSelect:\n");
 		warpPrint("\r- 'a': set default sensor.\n");

@@ -37,20 +37,23 @@ initINA219(const uint8_t i2cAddress, uint16_t operatingVoltageMillivolts)
 	deviceINA219State.i2cAddress					= i2cAddress;
 	deviceINA219State.operatingVoltageMillivolts	= operatingVoltageMillivolts;
 	configureSensorINA219();
-
-	WarpStatus regStatus;
-	regStatus = readSensorRegisterINA219(INA219_ConfigurationRegister, 2);
-	warpPrint("Configuration Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
-		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
-
-	regStatus = readSensorRegisterINA219(INA219_CalibrationRegister, 2);
-	warpPrint("Calibration Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
-		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
-
-	regStatus = readSensorRegisterINA219(INA219_BusVoltageRegister, 2);
-	warpPrint("Bus Buffer[0]: 0x%X, Buffer[1]: 0x%X\n", 
-		deviceINA219State.i2cBuffer[0], deviceINA219State.i2cBuffer[1]);
 	return;
+}
+
+WarpStatus
+configureSensorINA219()
+{
+	WarpStatus	i2cWriteStatus1, i2cWriteStatus2;
+	warpPrint("\nConfiguring INA219...\n");
+
+	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
+
+	i2cWriteStatus1 = writeSensorRegisterINA219(INA219_ConfigurationRegister, (uint16_t)0b0000000110011111);
+
+	// i2cWriteStatus2 = writeSensorRegisterINA219(INA219_CalibrationRegister, (uint16_t)0x5000); // LSB 2e-8 (calibrated for min 10.8k resistor)
+	i2cWriteStatus2 = writeSensorRegisterINA219(INA219_CalibrationRegister, (uint16_t)0x6AAB); // LSB 1.5e-6 (calibrated for min 100 resistor)
+
+	return (i2cWriteStatus1 | i2cWriteStatus2);
 }
 
 WarpStatus
@@ -102,17 +105,74 @@ writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 	return kWarpStatusOK;
 }
 
+WarpStatus writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
+{
+	uint8_t  commandByte[1];
+    uint16_t payloadBytes[2]
+	i2c_status_t status;
+
+	// Allow writing only to valid registers (Configuration and Calibration)
+	switch (deviceRegister)
+	{
+		case 0x00: case 0x05: 
+			break;
+		default:
+			return kWarpStatusBadDeviceCommand;
+	}
+
+	// Define the I2C slave device
+	i2c_device_t slave =
+	{
+		.address = deviceINA219State.i2cAddress,
+		.baudRate_kbps = gWarpI2cBaudRateKbps
+	};
+
+	// Set voltage and enable I2C pins
+	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
+	warpEnableI2Cpins();
+
+	// Prepare command and payload bytes
+	commandByte[0] = deviceRegister;
+	payloadBytes[0] = (payload >> 8) & 0xFF; // MSB first
+	payloadBytes[1] = payload & 0xFF;        // LSB
+
+	// Send the command and the 2-byte payload
+	status = I2C_DRV_MasterSendDataBlocking(
+		0, // I2C instance
+		&slave,
+		commandByte,
+		1, // Command byte size
+		payloadBytes,
+		2, // Payload size (16-bit, 2 bytes)
+		gWarpI2cTimeoutMilliseconds
+	);
+
+	// Check if communication was successful
+	if (status != kStatus_I2C_Success)
+	{   
+        warpPrint("WRITE FAILED \n");
+		return kWarpStatusDeviceCommunicationFailed;
+	}
+
+	return kWarpStatusOK;
+}
+
+
 WarpStatus
-configureSensorINA219()
+configureSensorINA219(uint16_t payload_CONFIG, uint16_t payload_CALIBRATE)
 {
 	WarpStatus	i2cWriteStatus1, i2cWriteStatus2;
-	warpPrint("\nConfiguring INA219...\n");
 
+    warpPrint("CONFIGURATION TIME \n");
 	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
 
-	i2cWriteStatus1 = writeSensorRegisterINA219(INA219_ConfigurationRegister, (uint16_t)0b0000000110011111);
+	i2cWriteStatus1 = writeSensorRegisterINA219(kWarpSensorConfigurationRegisterINA219_CALIBRATION/* register address F_SETUP */,
+												  payload_CONFIG /* payload: Disable FIFO */
+	);
 
-	i2cWriteStatus2 = writeSensorRegisterINA219(INA219_CalibrationRegister, (uint16_t)0x5000);  
+	i2cWriteStatus2 = writeSensorRegisterINA219(kWarpSensorConfigurationRegisterINA219_CALIBRATION /* register address CTRL_REG1 */,
+												  payload_CALIBRATE /* payload */
+	);
 
 	return (i2cWriteStatus1 | i2cWriteStatus2);
 }
@@ -204,69 +264,13 @@ printSensorDataINA219(bool hexModeFlag)
 void
 printCurrentINA219()
 {
-	uint16_t	shunt_voltage;
-	uint16_t	current;
-	uint16_t	calibration;
 	WarpStatus	i2cReadStatus;
 
 	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
 
-	i2cReadStatus = readSensorRegisterINA219(INA219_BusVoltageRegister, 2);
-	shunt_voltage = (deviceINA219State.i2cBuffer[0] << 8) | deviceINA219State.i2cBuffer[1];
-	float shunt_voltage_mV = (float)shunt_voltage * 0.01;
-	warpPrint("Shunt voltage (mV) = %.2f,\n", shunt_voltage_mV);
-
-	i2cReadStatus = readSensorRegisterINA219(INA219_CalibrationRegister, 2);
-	calibration = (deviceINA219State.i2cBuffer[1] | deviceINA219State.i2cBuffer[0] << 8);
-
 	i2cReadStatus = readSensorRegisterINA219(INA219_CurrentRegister, 2);
-	current = (deviceINA219State.i2cBuffer[1] | deviceINA219State.i2cBuffer[0] << 8);
-	float current_mA = shunt_voltage_mV * 0.01 * (float)calibration / 4096.f;
-
-	if (i2cReadStatus != kWarpStatusOK)
-	{
-		warpPrint(" ----,");
-	}
-	else
-	{
-		warpPrint("Calculated current (mA) = %.2f,\n", current_mA);
-		warpPrint("Current (mA) = %.2f,\n\n", current);
-	}
-}
-
-uint8_t
-appendSensorDataINA219(uint8_t* buf)
-{
-	uint8_t index = 0;
-	uint16_t readSensorRegisterValueLSB;
-	uint16_t readSensorRegisterValueMSB;
-	int16_t readSensorRegisterValueCombined;
-	WarpStatus i2cReadStatus;
-
-	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
-
-	i2cReadStatus                   = readSensorRegisterINA219(INA219_CurrentRegister, 2 /* numberOfBytes */);
-	readSensorRegisterValueMSB      = deviceINA219State.i2cBuffer[0];
-	readSensorRegisterValueLSB      = deviceINA219State.i2cBuffer[1];
-	readSensorRegisterValueCombined = (readSensorRegisterValueLSB | readSensorRegisterValueMSB << 8);
-
-	if (i2cReadStatus != kWarpStatusOK)
-	{
-		buf[index] = 0;
-		index += 1;
-
-		buf[index] = 0;
-		index += 1;
-	}
-	else
-	{
-		/*
-		 * MSB first
-		 */
-		buf[index] = (uint8_t)(readSensorRegisterValueCombined >> 8);
-		index += 1;
-
-		buf[index] = (uint8_t)(readSensorRegisterValueCombined);
-		index += 1;
-	}
+	int16_t current = (deviceINA219State.i2cBuffer[1] | deviceINA219State.i2cBuffer[0] << 8);
+	int16_t LSB = 15;
+	if (i2cReadStatus != kWarpStatusOK) { warpPrint(" ----,"); }
+	else { warpPrint("%d \n", current * LSB); }
 }
