@@ -56,59 +56,10 @@ configureSensorINA219()
 	return (i2cWriteStatus1 | i2cWriteStatus2);
 }
 
-WarpStatus
-writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
-{ // All INA219 16-bit registers are two 8-bit bytes via I2C 
-	uint8_t		payloadByte[2], commandByte[1];
-	i2c_status_t	status;
-
-	switch (deviceRegister)
-	{
-		case 0x00: case 0x05: // Can only write to configuration and calibration registers
-		{
-			/* OK */
-			break;
-		}
-
-		default:
-		{
-			warpPrint("kWarpStatusBadDeviceCommand\n");
-			return kWarpStatusBadDeviceCommand;
-		}
-	}
-
-	i2c_device_t slave =
-		{
-		.address = deviceINA219State.i2cAddress,
-		.baudRate_kbps = gWarpI2cBaudRateKbps
-	};
-
-	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
-	commandByte[0] = deviceRegister;
-	payloadByte[0] = (uint8_t)(payload >> 8); // MSB
-	payloadByte[1] = (uint8_t)(payload & 0xFF); // LSB
-	warpEnableI2Cpins();
-
-	status = I2C_DRV_MasterSendDataBlocking(
-		0 /* I2C instance */,
-		&slave,
-		commandByte,
-		1,
-		payloadByte,
-		2,
-		gWarpI2cTimeoutMilliseconds);
-	if (status != kStatus_I2C_Success)
-	{
-		return kWarpStatusDeviceCommunicationFailed;
-	}
-
-	return kWarpStatusOK;
-}
-
 WarpStatus writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 {
 	uint8_t  commandByte[1];
-    uint16_t payloadBytes[2]
+    uint16_t payloadBytes[2];
 	i2c_status_t status;
 
 	// Allow writing only to valid registers (Configuration and Calibration)
@@ -155,26 +106,6 @@ WarpStatus writeSensorRegisterINA219(uint8_t deviceRegister, uint16_t payload)
 	}
 
 	return kWarpStatusOK;
-}
-
-
-WarpStatus
-configureSensorINA219(uint16_t payload_CONFIG, uint16_t payload_CALIBRATE)
-{
-	WarpStatus	i2cWriteStatus1, i2cWriteStatus2;
-
-    warpPrint("CONFIGURATION TIME \n");
-	warpScaleSupplyVoltage(deviceINA219State.operatingVoltageMillivolts);
-
-	i2cWriteStatus1 = writeSensorRegisterINA219(kWarpSensorConfigurationRegisterINA219_CALIBRATION/* register address F_SETUP */,
-												  payload_CONFIG /* payload: Disable FIFO */
-	);
-
-	i2cWriteStatus2 = writeSensorRegisterINA219(kWarpSensorConfigurationRegisterINA219_CALIBRATION /* register address CTRL_REG1 */,
-												  payload_CALIBRATE /* payload */
-	);
-
-	return (i2cWriteStatus1 | i2cWriteStatus2);
 }
 
 WarpStatus

@@ -91,6 +91,8 @@
 #include "devSSD1331.h"
 #include "devINA219.h"
 
+#include "4B25_coursework.h"
+
 #if (WARP_BUILD_ENABLE_DEVADXL362)
 	volatile WarpSPIDeviceState			deviceADXL362State;
 #endif
@@ -2081,40 +2083,30 @@ main(void)
 		gWarpExtraQuietMode = false;
 		printBootSplash(gWarpCurrentSupplyVoltage, menuRegisterAddress, &powerManagerCallbackStructure);
 
-		devSSD1331init();
-		OSA_TimeDelay(1000);
+		run_4B25_coursework();
+		OSA_TimeDelay(100000);
 
-
-		warpPrint("Initialising INA219...");
-		OSA_TimeDelay(1000);
-		initINA219(	0x40, kWarpDefaultSupplyVoltageMillivoltsINA219);
-		for (int i = 0; i < 100; i++){
-			printCurrentINA219();
-		}
-		warpPrint("\nFinished running INA219 loop.\n");
-
-		
-		warpPrint("\rSelect:\n");
-		warpPrint("\r- 'a': set default sensor.\n");
-		warpPrint("\r- 'b': set I2C baud rate.\n");
-		warpPrint("\r- 'c': set SPI baud rate.\n");
-		warpPrint("\r- 'd': set UART baud rate.\n");
-		warpPrint("\r- 'e': set default register address.\n");
-		warpPrint("\r- 'f': write byte to sensor.\n");
-		warpPrint("\r- 'g': set default sensor supply voltage.\n");
-		warpPrint("\r- 'h': powerdown command to all sensors.\n");
-		warpPrint("\r- 'i': set pull-up enable value.\n");
-		warpPrint("\r- 'j': repeat read reg 0x%02x on sensor #%d.\n", menuRegisterAddress, menuTargetSensor);
-		warpPrint("\r- 'k': sleep until reset.\n");
-		warpPrint("\r- 'l': send repeated byte on I2C.\n");
-		warpPrint("\r- 'm': send repeated byte on SPI.\n");
-		warpPrint("\r- 'n': enable sensor supply voltage.\n");
-		warpPrint("\r- 'o': disable sensor supply voltage.\n");
-		warpPrint("\r- 'p': switch to VLPR mode.\n");
-		warpPrint("\r- 'r': switch to RUN mode.\n");
-		warpPrint("\r- 's': power up all sensors.\n");
-		warpPrint("\r- 't': dump processor state.\n");
-		warpPrint("\r- 'u': set I2C address.\n");
+		// warpPrint("\rSelect:\n");
+		// warpPrint("\r- 'a': set default sensor.\n");
+		// warpPrint("\r- 'b': set I2C baud rate.\n");
+		// warpPrint("\r- 'c': set SPI baud rate.\n");
+		// warpPrint("\r- 'd': set UART baud rate.\n");
+		// warpPrint("\r- 'e': set default register address.\n");
+		// warpPrint("\r- 'f': write byte to sensor.\n");
+		// warpPrint("\r- 'g': set default sensor supply voltage.\n");
+		// warpPrint("\r- 'h': powerdown command to all sensors.\n");
+		// warpPrint("\r- 'i': set pull-up enable value.\n");
+		// warpPrint("\r- 'j': repeat read reg 0x%02x on sensor #%d.\n", menuRegisterAddress, menuTargetSensor);
+		// warpPrint("\r- 'k': sleep until reset.\n");
+		// warpPrint("\r- 'l': send repeated byte on I2C.\n");
+		// warpPrint("\r- 'm': send repeated byte on SPI.\n");
+		// warpPrint("\r- 'n': enable sensor supply voltage.\n");
+		// warpPrint("\r- 'o': disable sensor supply voltage.\n");
+		// warpPrint("\r- 'p': switch to VLPR mode.\n");
+		// warpPrint("\r- 'r': switch to RUN mode.\n");
+		// warpPrint("\r- 's': power up all sensors.\n");
+		// warpPrint("\r- 't': dump processor state.\n");
+		// warpPrint("\r- 'u': set I2C address.\n");
 
 #if (WARP_BUILD_ENABLE_DEVAT45DB)
 		warpPrint("\r- 'R': read bytes from Flash.\n");
@@ -2168,93 +2160,6 @@ main(void)
 					warpPrint("\r\t- '5' MMA8451Q			(0x00--0x31): 1.95V -- 3.6V\n");
 #else
 					warpPrint("\r\t- '5' MMA8451Q			(0x00--0x31): 1.95V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVLPS25H)
-					warpPrint("\r\t- '6' LPS25H			(0x08--0x24): 1.7V -- 3.6V\n");
-#else
-					warpPrint("\r\t- '6' LPS25H			(0x08--0x24): 1.7V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVMAG3110)
-					warpPrint("\r\t- '7' MAG3110			(0x00--0x11): 1.95V -- 3.6V\n");
-#else
-					warpPrint("\r\t- '7' MAG3110			(0x00--0x11): 1.95V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVHDC1000)
-					warpPrint("\r\t- '8' HDC1000			(0x00--0x1F): 3.0V -- 5.0V\n");
-#else
-					warpPrint("\r\t- '8' HDC1000			(0x00--0x1F): 3.0V -- 5.0V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVSI7021)
-					warpPrint("\r\t- '9' SI7021			(0x00--0x0F): 1.9V -- 3.6V\n");
-#else
-					warpPrint("\r\t- '9' SI7021			(0x00--0x0F): 1.9V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVL3GD20H)
-					warpPrint("\r\t- 'a' L3GD20H			(0x0F--0x39): 2.2V -- 3.6V\n");
-#else
-					warpPrint("\r\t- 'a' L3GD20H			(0x0F--0x39): 2.2V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVBME680)
-					warpPrint("\r\t- 'b' BME680			(0xAA--0xF8): 1.6V -- 3.6V\n");
-#else
-					warpPrint("\r\t- 'b' BME680			(0xAA--0xF8): 1.6V -- 3.6V (compiled out) \n");
-#endif
-#if (WARP_BUILD_ENABLE_DEVBNO055)
-					warpPrint("\r\t- 'M' BNO055			(0x0D--0x75): 2.7V -- 3.6V\n");					
-#else
-					warpPrint("\r\t- 'M' BNO055			(0x0D--0x75): 2.7V -- 3.6V (compiled out) \n");					
-#endif
-#if (WARP_BUILD_ENABLE_DEVRF430CL331H)
-					warpPrint("\r\t- 'M' RF430CL331H			(0x0D--0x75): 3V -- 3.6V\n");					
-#else
-					warpPrint("\r\t- 'M' RF430CL331H			(0x0D--0x75): 3V -- 3.6V (compiled out) \n");					
-#endif
-#if (WARP_BUILD_ENABLE_DEVTCS34725)
-					warpPrint("\r\t- 'd' TCS34725			(0x00--0x1D): 2.7V -- 3.3V\n");
-#else
-					warpPrint("\r\t- 'd' TCS34725			(0x00--0x1D): 2.7V -- 3.3V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVSI4705)
-					warpPrint("\r\t- 'e' SI4705			(n/a):        2.7V -- 5.5V\n");
-#else
-					warpPrint("\r\t- 'e' SI4705			(n/a):        2.7V -- 5.5V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVCCS811)
-					warpPrint("\r\t- 'g' CCS811			(0x00--0xFF): 1.8V -- 3.6V\n");
-#else
-					warpPrint("\r\t- 'g' CCS811			(0x00--0xFF): 1.8V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVAMG8834)
-					warpPrint("\r\t- 'h' AMG8834			(0x00--?): 3.3V -- 3.3V\n");
-#else
-					warpPrint("\r\t- 'h' AMG8834			(0x00--?): 3.3V -- 3.3V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVAS7262)
-					warpPrint("\r\t- 'j' AS7262			(0x00--0x2B): 2.7V -- 3.6V\n");
-#else
-					warpPrint("\r\t- 'j' AS7262			(0x00--0x2B): 2.7V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVAS7263)
-					warpPrint("\r\t- 'k' AS7263			(0x00--0x2B): 2.7V -- 3.6V\n");
-#else
-					warpPrint("\r\t- 'k' AS7263			(0x00--0x2B): 2.7V -- 3.6V (compiled out) \n");
-#endif
-
-#if (WARP_BUILD_ENABLE_DEVINA219)
-					warpPrint("\r\t- 'l' IN219			(0x00--0x2B): 3.0V -- 5.5V\n");
-#else
-					warpPrint("\r\t- 'l' IN219			(0x00--0x2B): 3.0V -- 5.5V (compiled out) \n");
 #endif
 
 				warpPrint("\r\tEnter selection> ");
