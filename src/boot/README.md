@@ -7,23 +7,23 @@ This project uses accelerometer data to classify different activities performed 
 ## File Structure
 
 ### **data/**
-- **CSV Files**: Contains raw accelerometer data for different activities (hook, jab, rest, curl, t-pose, shoulder_rotation, and rotating_punch).
+- **CSV Files**: Contains raw accelerometer data for different activities (hook, jab, rest, curl, t-pose, shoulder_rotation, and rotating_punch)
 
 ### **python/**
-- **plot_raw_data.py**: This script plots the raw accelerometer data to visualize the signal for each activity.
+- **plot_raw_data.py**: this script plots the raw accelerometer data to visualize the signal for each activity.
   
-- **feature_classifier.py**: This script processes the raw accelerometer data, extracts relevant features (mean, standard deviation, etc.), and trains a **multiclass logistic regression** model to classify the activity based on these features.
+- **feature_classifier.py**: this script uses raw accelerometer data and extracts features, then trains a multiclass logistic regression algorithm to the learn the mapping from the features to class for classification
   
-- **logistic_model.txt**: The output of the trained logistic regression model. This file contains the learned weights and biases that map the extracted features to the activity classes.
+- **logistic_model.txt**: output of the trained logistic model from the feature_classifier.py file, containing the learned weights and biases that map the extracted features to the activity classes
 
 ### **warp/**
-This folder contains the files and modifications necessary to run the classification system on the embedded system using the Warp SDK (ksdk1.1.0).
+This folder contains the files and modifications necessary to run the classification system on the embedded system using Warp
 
 #### **ksdk1.1.0 (Modified Files)**
-- **boot.c**: The `while(1)` loop has been modified to remove unnecessary code and call the `run_4B25_coursework()` function from `4B25_coursework.c` to integrate the coursework functionality.
+- **boot.c**: removed everything from while(1) loop and added run_4B25_coursework() function found in 4B25_coursework.c
   
-- **CMakeLists-FRDMKL03.txt**: The `4B25_coursework.c` file has been added to the makefile to ensure it's compiled and linked with the project.
+- **CMakeLists-FRDMKL03.txt**: The `4B25_coursework.c` file has been added to the makefile
   
-- **4B25_coursework.h**: Header file defining the necessary functions and variables used in `4B25_coursework.c` for the coursework.
+- **4B25_coursework.h**: Header file defining the necessary functions and variables used in `4B25_coursework.c`
   
-- **4B25_coursework.c**: Contains the code that implements the functionality of the coursework, integrating the activity classification with the embedded platform.
+- **4B25_coursework.c**: Contains the code that implements the functionality of the coursework
